@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import argparse
 import sys
 from typing import Sequence
+
+from .search import iter_search_results
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -41,9 +45,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parse_args(argv)
 
-    # 打印解析结果，用于测试
-    print(f"roots   : {args.roots}")
-    print(f"pattern : {args.pattern}")
-    print(f"ignore  : {args.ignore}")
+    results = iter_search_results(
+        roots=args.roots,
+        pattern=args.pattern,
+        ignore_patterns=args.ignore,
+    )
+
+    found_any = False
+    for item in results:
+        # 找到任何结果时设置标志为 True
+        found_any = True
+        # 简单文本输出：路径 | 大小(字节) | 修改时间(时间戳)
+        print(f"{item.path}  {item.size} bytes  mtime={item.mtime}")
+    if not found_any:
+        # 没找到任何结果时给个提示
+        print("No matching files found.", file=sys.stderr)
 
     return 0
