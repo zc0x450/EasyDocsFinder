@@ -1,0 +1,6 @@
+# python虚拟环境
+.venv/
+# python缓存
+__pycache__/
+# pytest缓存
+.pytest_cache/
