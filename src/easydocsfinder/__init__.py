@@ -37,6 +37,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Glob pattern to ignore (can be used multiple times).",
     )
 
+    # 添加可选参数：指定要搜索的最大结果数
+    parser.add_argument(
+        "--max-results",
+        type=int,
+        default=0,
+        help="Stop after finding N results. 0 means no limit.",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -46,10 +54,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = parse_args(argv)
 
+    max_results = None if args.max_results == 0 else args.max_results
     results = iter_search_results(
         roots=args.roots,
         pattern=args.pattern,
         ignore_patterns=args.ignore,
+        max_results=max_results,
     )
 
     found_any = False
