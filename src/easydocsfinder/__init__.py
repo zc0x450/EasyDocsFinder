@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 from typing import Sequence
+from datetime import datetime
 
 from .search import iter_search_results
 
@@ -55,8 +56,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     for item in results:
         # 找到任何结果时设置标志为 True
         found_any = True
-        # 简单文本输出：路径 | 大小(字节) | 修改时间(时间戳)
-        print(f"{item.path}  {item.size} bytes  mtime={item.mtime}")
+        # 简单文本输出：路径 | 大小(字节) | 修改时间（人类可读的时间）
+        human_readable_mtime = datetime.fromtimestamp(item.mtime).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        print(f"{item.path} | {item.size} bytes | mtime={human_readable_mtime}")
     if not found_any:
         # 没找到任何结果时给个提示
         print("No matching files found.", file=sys.stderr)

@@ -62,3 +62,27 @@ def test_search_multiple_roots(tmp_path: Path) -> None:
 
     found_names = sorted(p.path.name for p in results)
     assert found_names == ["a.py", "b.py"]
+
+
+def test_iter_search_results_ignore_directory(tmp_path: Path) -> None:
+    """
+    被忽略的子目录中的文件不会被遍历到。
+    """
+    keep_dir = tmp_path / "keep"
+    ignore_dir = tmp_path / ".venv"
+    keep_dir.mkdir()
+    ignore_dir.mkdir()
+
+    (keep_dir / "a.py").write_text("a")
+    (ignore_dir / "b.py").write_text("b")
+
+    results = list(
+        iter_search_results(
+            roots=[tmp_path],
+            pattern="*.py",
+            ignore_patterns=[".venv"],
+        )
+    )
+
+    found_names = sorted(p.path.name for p in results)
+    assert found_names == ["a.py"]

@@ -14,23 +14,42 @@ class SearchResult:
     mtime: float  # 文件的最后修改时间(时间戳)
 
 
-def _should_ignore(path: Path, ignore_patterns: Sequence[str]) -> bool:
-    """
-    检查文件是否应该被忽略
-    Args:
-        path: 文件的绝对路径
-        ignore_patterns: 忽略模式列表
-    Returns:
-        True 如果文件应该被忽略, False 如果文件不应该被忽略
-    """
-    name = path.name
-    for pattern in ignore_patterns:
+def _name_matches_any(name: str, patterns: Sequence[str]) -> bool:
+    for pattern in patterns:
         # 通过 fnmatch 函数检查文件名是否匹配忽略模式
         # fnmatch 函数是 Python 标准库中的一个函数，用于匹配文件名
         # 它使用通配符模式来匹配文件名
         if fnmatch(name, pattern):
             return True
     return False
+
+
+def _walk_path(
+    root: Path,
+    pattern: str,
+    ignore_patterns: Sequence[str],
+) -> Iterator[SearchResult]:
+    for entry in root.iterdir():
+        # 列出根目录下的所有文件和目录，不递归
+        if entry.is_dir():
+            # 目录名命中忽略规则：剪枝，不再递归
+            if _name_matches_any(entry.name, ignore_patterns):
+                continue
+            # 否则递归进入子目录，通过yield from把子目录的搜索结果传递给父级
+            yield from _walk_path(entry, pattern, ignore_patterns)
+        elif entry.is_file():
+            # 先按 pattern 过滤
+            if not fnmatch(entry.name, pattern):
+                continue
+            # 再按 ignore_patterns 过滤文件名
+            if _name_matches_any(entry.name, ignore_patterns):
+                continue
+            stat = entry.stat()
+            yield SearchResult(
+                path=entry.resolve(),
+                size=stat.st_size,
+                mtime=stat.st_mtime,
+            )
 
 
 def iter_search_results(
@@ -48,34 +67,11 @@ def iter_search_results(
     for root in roots:
         # 遍历要搜索的根目录，首先转换为 Path 对象
         root_path = Path(root)
-        if not root_path.exists():
-            # 如果该目录不存在，则跳过
+        # 如果该目录不存在或不是目录，则跳过
+        if not root_path.exists() or not root_path.is_dir():
             continue
-        if not root_path.is_dir():
-            # 如果该路径不是目录，则跳过
-            continue
-
-        for entry in root_path.rglob("*"):
-            # 递归遍历得到该路径下的所有文件路径
-            if not entry.is_file():
-                # 如果该路径不是文件，则跳过
-                continue
-
-            if not fnmatch(entry.name, pattern):
-                # 如果该文件名不符合 pattern 过滤条件，则跳过
-                continue
-
-            if _should_ignore(entry, ignore_patterns):
-                # 如果该文件名符合 ignore_patterns 忽略模式，则跳过
-                continue
-
-            stat = entry.stat()  # 获取文件的统计信息
-            # 生成一个 SearchResult 对象，并返回
-            yield SearchResult(
-                path=entry.resolve(),  # 获取文件的绝对路径
-                size=stat.st_size,  # 获取文件的大小
-                mtime=stat.st_mtime,  # 获取文件的最后修改时间
-            )
+        # 递归遍历该目录下的所有文件和目录，通过yield from把子目录的搜索结果传递给父级
+        yield from _walk_path(root_path, pattern, ignore_patterns)
 
 
 def search(
