@@ -5,7 +5,7 @@ import sys
 from typing import Sequence
 from datetime import datetime
 
-from .search import iter_search_results
+from .search import iter_search_results, search_concurrent
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -45,6 +45,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Stop after finding N results. 0 means no limit.",
     )
 
+    # 添加可选参数：指定要使用的最大线程数
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="Number of worker threads for --concurrent (default: 8).",
+    )
+
+    # 添加可选参数：指定是否使用并发模式
+    parser.add_argument(
+        "--concurrent",
+        action="store_true",
+        help="Use concurrent directory traversal (threads).",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -55,12 +70,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
     max_results = None if args.max_results == 0 else args.max_results
-    results = iter_search_results(
-        roots=args.roots,
-        pattern=args.pattern,
-        ignore_patterns=args.ignore,
-        max_results=max_results,
-    )
+
+    if args.concurrent:
+        results = search_concurrent(
+            roots=args.roots,
+            pattern=args.pattern,
+            ignore_patterns=args.ignore,
+            max_results=max_results,
+            max_workers=args.workers,
+        )
+    else:
+        results = iter_search_results(
+            roots=args.roots,
+            pattern=args.pattern,
+            ignore_patterns=args.ignore,
+            max_results=max_results,
+        )
 
     found_any = False
     for item in results:

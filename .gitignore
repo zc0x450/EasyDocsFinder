@@ -4,3 +4,5 @@
 __pycache__/
 # pytest缓存
 .pytest_cache/
+# 设计文档
+target.md
