@@ -7,13 +7,15 @@ def test_main_uses_concurrent_when_flag_set(monkeypatch, capsys):
     called = {}
 
     def fake_search_concurrent(
-        *, roots, pattern, ignore_patterns, max_results, max_workers
+        *, roots, pattern, ignore_patterns, max_results, max_workers, contains, encoding
     ):
         called["roots"] = roots
         called["pattern"] = pattern
         called["ignore_patterns"] = ignore_patterns
         called["max_results"] = max_results
         called["max_workers"] = max_workers
+        called["contains"] = contains
+        called["encoding"] = encoding
         return []  # 让 main() 走到 “No matching...” 分支，避免真正遍历
 
     # 注意：__init__.py 里是 `from .search import ...`，所以要 patch easydocsfinder.search_concurrent 这个名字
@@ -31,6 +33,10 @@ def test_main_uses_concurrent_when_flag_set(monkeypatch, capsys):
             "*.py",
             "-i",
             ".git",
+            "--contains",
+            "",
+            "--encoding",
+            "utf-8",
         ]
     )
     assert rc == 0
@@ -41,6 +47,8 @@ def test_main_uses_concurrent_when_flag_set(monkeypatch, capsys):
         "ignore_patterns": [".git"],
         "max_results": 10,
         "max_workers": 3,
+        "contains": "",
+        "encoding": "utf-8",
     }
 
     out = capsys.readouterr()

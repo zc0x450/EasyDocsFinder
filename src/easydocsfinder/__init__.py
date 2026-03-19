@@ -6,6 +6,7 @@ from typing import Sequence
 from datetime import datetime
 
 from .search import iter_search_results, search_concurrent
+from .utils import _print_content_matches
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -60,6 +61,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Use concurrent directory traversal (threads).",
     )
 
+    # 添加可选参数：指定只保留包含指定文本的文件
+    parser.add_argument(
+        "--contains",
+        default=None,
+        help="Only keep files whose content contains this text.",
+    )
+
+    parser.add_argument(
+        "--encoding",
+        default="utf-8",
+        help="Text encoding for --contains (default: utf-8).",
+    )
+
     return parser.parse_args(argv)
 
 
@@ -78,6 +92,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             ignore_patterns=args.ignore,
             max_results=max_results,
             max_workers=args.workers,
+            contains=args.contains,
+            encoding=args.encoding,
         )
     else:
         results = iter_search_results(
@@ -85,6 +101,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             pattern=args.pattern,
             ignore_patterns=args.ignore,
             max_results=max_results,
+            contains=args.contains,
+            encoding=args.encoding,
         )
 
     found_any = False
@@ -96,6 +114,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "%Y-%m-%d %H:%M:%S"
         )
         print(f"{item.path} | {item.size} bytes | mtime={human_readable_mtime}")
+        if args.contains is not None:
+            _print_content_matches(item.path, args.contains, args.encoding)
     if not found_any:
         # 没找到任何结果时给个提示
         print("No matching files found.", file=sys.stderr)

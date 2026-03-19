@@ -26,12 +26,49 @@ def _name_matches_any(name: str, patterns: Sequence[str]) -> bool:
     return False
 
 
+def _file_contains_text(
+    path: Path,
+    needle: str,
+    *,  # 这里强制要求encoding和chunk_size必须通过关键字参数传入
+    encoding: str = "utf-8",
+    chunk_size: int = 64 * 1024,
+) -> bool:
+    if needle == "":
+        # 如果needle为空字符串，则认为包含空文本的文件是符合条件的
+        return True
+
+    # 处理跨chunk匹配的情况，如果needle在chunk中间，则需要保留一部分尾巴，以便下次匹配
+    # 这里尾巴的长度为needle的长度减1，因为如果需要到下一个chunk中去匹配，
+    # 那么毫无疑问在第一个chunk中是不可能有needle的完整匹配的，最多只能匹配到needle的前len(needle)-1个字符
+    keep = max(len(needle) - 1, 0)
+    tail = ""  # 尾巴字符串
+
+    try:
+        with path.open("r", encoding=encoding, errors="ignore") as f:
+            while True:
+                chunk = f.read(chunk_size)  # 分块从文件中读取数据
+                if not chunk:
+                    # 如果读取到文件末尾还没有找到needle，则认为文件不包含needle
+                    return False
+                data = tail + chunk  # 将尾巴字符串和当前chunk拼接起来
+                if needle in data:
+                    # 如果data中包含needle，则认为文件包含needle
+                    return True
+                # 如果data中不包含needle，则需要保留一部分尾巴，以便下次匹配
+                # 这里是从倒数第keep个字符开始保留，一直到data的末尾
+                tail = data[-keep:] if keep else ""
+    except OSError:
+        return False
+
+
 def _walk_path(
     root: Path,
     pattern: str,
     ignore_patterns: Sequence[str],
     counter: list[int],
     max_results: int | None,
+    contains: str | None = None,
+    encoding: str = "utf-8",
 ) -> Iterator[SearchResult]:
     for entry in root.iterdir():
         # 如果达到最大结果数，则停止遍历(终止生成器)
@@ -52,6 +89,12 @@ def _walk_path(
             if _name_matches_any(entry.name, ignore_patterns):
                 continue
 
+            # 如果指定了要搜索的文本，则需要检查文件是否包含该文本
+            if contains is not None and not _file_contains_text(
+                entry, contains, encoding=encoding
+            ):
+                continue
+
             stat = entry.stat()
             counter[0] += 1  # 每找到一个结果，计数器加1
             yield SearchResult(
@@ -66,6 +109,8 @@ def iter_search_results(
     pattern: str = "*",
     ignore_patterns: Sequence[str] | None = None,
     max_results: int | None = None,
+    contains: str | None = None,
+    encoding: str = "utf-8",
 ) -> Iterator[SearchResult]:
     """
     串行遍历 roots 下的所有文件，按 pattern 过滤，并按 ignore_patterns 忽略。
@@ -88,7 +133,15 @@ def iter_search_results(
         if not root_path.exists() or not root_path.is_dir():
             continue
         # 递归遍历该目录下的所有文件和目录，通过yield from把子目录的搜索结果传递给父级
-        yield from _walk_path(root_path, pattern, ignore_patterns, counter, max_results)
+        yield from _walk_path(
+            root_path,
+            pattern,
+            ignore_patterns,
+            counter,
+            max_results,
+            contains,
+            encoding,
+        )
 
 
 """
@@ -106,6 +159,8 @@ def search_concurrent(
     ignore_patterns: Sequence[str] | None = None,
     max_results: int | None = None,
     max_workers: int = 8,
+    contains: str | None = None,
+    encoding: str = "utf-8",
 ) -> list[SearchResult]:
     """
     多线程并发遍历目录树并收集结果（返回 list）。
@@ -171,6 +226,12 @@ def search_concurrent(
                             continue
                         # 文件名忽略规则过滤
                         if _name_matches_any(entry.name, ignore_patterns):
+                            continue
+
+                        # 如果指定了要搜索的文本，则需要检查文件是否包含该文本
+                        if contains is not None and not _file_contains_text(
+                            entry, contains, encoding=encoding
+                        ):
                             continue
 
                         # 获取文件的统计信息
