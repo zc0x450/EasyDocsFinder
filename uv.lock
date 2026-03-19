@@ -15,12 +15,15 @@ wheels = [
 name = "easydocsfinder"
 version = "0.1.0"
 source = { editable = "." }
-dependencies = [
+
+[package.optional-dependencies]
+dev = [
     { name = "pytest" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pytest", specifier = ">=9.0.2" }]
+requires-dist = [{ name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" }]
+provides-extras = ["dev"]
 
 [[package]]
 name = "iniconfig"
