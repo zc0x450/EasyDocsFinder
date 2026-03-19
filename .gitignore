@@ -6,3 +6,7 @@ __pycache__/
 .pytest_cache/
 # 设计文档
 target.md
+# build相关的目录
+build/
+dist/
+*.spec
